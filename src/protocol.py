@@ -1,4 +1,4 @@
-"""Strict, explicit manifests; test rows never enter model construction."""
+"""Dataset manifests and split validation."""
 from __future__ import annotations
 
 import csv
@@ -39,8 +39,7 @@ def read_manifest(dataset: str, cfg: dict) -> list[dict]:
     if not rows:
         raise ValueError(f"Empty manifest: {path}")
     if dataset == "aebad":
-        # Match the locked BladeGL protocol: one duplicate normal train file is
-        # excluded by first-occurrence SHA256, yielding 416 rather than 417.
+        # Deduplicate images by SHA-256, retaining the first occurrence.
         seen = set()
         unique = []
         for row in rows:

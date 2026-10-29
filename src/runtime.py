@@ -1,4 +1,4 @@
-"""Unchanged JSON and seed helpers extracted from the experiment runtime."""
+"""JSON output and random seed utilities."""
 from pathlib import Path
 import json
 import os

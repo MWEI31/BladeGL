@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run BladeGL source and structural/task ablations on one GPU."""
+"""Train and evaluate BladeGL model variants."""
 import argparse
 import json
 import os
@@ -29,7 +29,7 @@ def main():
     args = p.parse_args()
     cfg = load_config(args.config)
     if args.seed not in cfg['seeds'] or not 0 < args.budget <= 1:
-        p.error('Seed or budget is outside the locked protocol')
+        p.error('Seed must be listed in the configuration and budget must be in (0, 1].')
     if not 0 <= args.readout_weight <= 1:
         p.error('Readout weight must be in [0,1]')
     make_head(args.arm)

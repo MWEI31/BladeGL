@@ -1,4 +1,4 @@
-"""Structural and task-connection variants of the locked BladeGL head."""
+"""BladeGL model variants."""
 import torch
 from torch.nn import functional as F
 

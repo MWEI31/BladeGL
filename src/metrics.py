@@ -77,7 +77,7 @@ def normal_quantile(rows, scores, q: float):
 
 
 def image_threshold_recall_floor(rows, scores, minimum_recall=.90):
-    """Locked shared calibration rule: max F1 with image recall at least .90."""
+    """Maximize image F1 subject to recall >= 0.90."""
     labels = np.asarray([int(r['label']) for r in rows], bool)
     values = np.asarray(scores, np.float64)
     if not labels.any() or labels.all():
@@ -204,8 +204,8 @@ def select_pixel_threshold(data_root, rows, probabilities, original_shapes, cand
     options = []
     minimum = min(float(np.min(p)) for _, p, _ in positive)
     maximum = max(float(np.max(p)) for _, p, _ in positive)
-    # Probability outputs preserve the locked .01..99 grid; raw anomaly
-    # distances use a calibration-only range, never test-map statistics.
+    # Use the .01..99 grid for probabilities and a calibration-derived
+    # range for raw anomaly distances.
     thresholds = np.linspace(.01, .99, candidates) if 0 <= minimum and maximum <= 1 \
         else np.linspace(minimum, maximum, candidates)
     for threshold in thresholds:

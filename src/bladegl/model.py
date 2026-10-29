@@ -1,7 +1,6 @@
-"""Final fusion candidates with explicit FP32 attention and shared spatial protocol.
+"""CECF and fusion variants with FP32 attention.
 
-Cosine logits adapt Swin V2; residual depthwise projections adapt CvT's
-convolutional attention idea. These operators are task adaptations.
+Cosine attention follows Swin V2; the depthwise branch follows CvT.
 """
 import math
 import torch
@@ -15,11 +14,10 @@ ABLATIONS = ('no_position', 'no_shift', 'self', 'two_regular')
 
 
 class LocalExchange(nn.Module):
-    """Local queries contextual keys; regular and shifted views share weights.
+    """Windowed attention with local queries and full-image keys.
 
-    two_regular changes depth as well as geometry; it is a comparable-work
-    alternative, not a pure shift toggle. self changes K/V to local features
-    while the final global fusion pathway stays intact.
+    Regular and shifted windows share weights. two_regular applies two
+    regular-window updates; self_attention uses local keys and values.
     """
     def __init__(self, cosine=False, convolution=False, position=True,
                  shifted=True, self_attention=False, two_regular=False,
@@ -32,8 +30,7 @@ class LocalExchange(nn.Module):
         self.shifted, self.self_attention = shifted, self_attention
         self.two_regular = two_regular
         self.norm_g, self.norm_l = nn.LayerNorm(96), nn.LayerNorm(96)
-        # Keep historical common attention initialization before removing
-        # the unused direction; all candidate differences are added afterward.
+        # Initialize Q/K/V jointly, then retain the active query and key/value weights.
         qkv_g, qkv_l = nn.Linear(96, 3*dim), nn.Linear(96, 3*dim)
         unused_out_g = nn.Linear(dim, 96)
         self.out_l = nn.Linear(dim, 96)
@@ -101,7 +98,7 @@ class LocalExchange(nn.Module):
                 logits = logits.masked_fill(self.shift_blocked[None,:,None],float('-inf'))
                 logits = logits.flatten(0,1)
             weights = logits.softmax(dim=-1)
-            # Identical FP32 value aggregation for every candidate.
+            # Aggregate values in FP32.
             result = (weights @ v32).to(v.dtype)
         return result.transpose(1,2).reshape(q.shape[0],q.shape[2],self.dim)
 

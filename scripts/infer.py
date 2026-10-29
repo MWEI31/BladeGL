@@ -1,4 +1,4 @@
-"""Run one image using a trained BladeGL head and optional locked calibration."""
+"""Single-image BladeGL inference with optional calibration."""
 import argparse
 import json
 from pathlib import Path
@@ -31,7 +31,7 @@ def main():
     if not args.input.is_file():
         parser.error('Input image does not exist')
     if not torch.cuda.is_available():
-        raise RuntimeError('The released raw-image inference path requires CUDA.')
+        raise RuntimeError('Single-image inference requires CUDA.')
     cfg = load_config(args.config)
     device = torch.device('cuda')
     encoder = Encoder(resolve('.'), cfg).to(device).eval()

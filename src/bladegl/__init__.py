@@ -1,1 +1,1 @@
-"""BladeGL source adapted from the locked fusion confirmation study."""
+"""BladeGL models and training routines."""

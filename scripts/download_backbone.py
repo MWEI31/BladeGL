@@ -1,4 +1,4 @@
-"""Download and verify only the official frozen DINOv2 checkpoint."""
+"""Download and verify the DINOv2 ViT-S/14 checkpoint."""
 import argparse
 import hashlib
 import json

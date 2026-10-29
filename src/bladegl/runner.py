@@ -1,8 +1,4 @@
-"""Raw-RGB BladeGL training and evaluation for E0, S, F, R, B and W arms.
-
-Features are extracted by one frozen DINOv2 encoder on demand, so this runner
-does not require the historical Windows feature cache. It never reads test
-labels until the locked checkpoint and calibration have been written.
+"""BladeGL training and evaluation with frozen DINOv2 features.
 """
 from __future__ import annotations
 

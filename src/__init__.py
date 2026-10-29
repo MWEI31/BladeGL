@@ -1,1 +1,1 @@
-"""Portable comparison experiment package."""
+"""BladeGL data, evaluation, and runtime utilities."""

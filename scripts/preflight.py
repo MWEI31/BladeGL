@@ -1,4 +1,4 @@
-"""Audit fixed data roles and optional input files before training."""
+"""Check dataset splits, input files, and backbone weights."""
 import argparse
 from collections import Counter
 import json

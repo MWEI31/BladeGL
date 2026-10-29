@@ -1,9 +1,7 @@
-"""H(CBAM([G,L])) with unchanged projection, geometry, decoder and classifier.
+"""CBAM fusion head for full-image and local features.
 
-CBAM operations follow https://github.com/Jongchan/attention-module/MODELS/cbam.py:
-shared avg/max channel MLP, followed by max/mean spatial convolution and BN.
-There is no LocalExchange, Q/K/V, window branch, CECF depthwise projection,
-relative bias, or CECF residual gate in this model.
+Channel and spatial attention follow the reference implementation:
+https://github.com/Jongchan/attention-module/MODELS/cbam.py
 """
 import torch
 from torch import nn
@@ -38,7 +36,7 @@ class CBAM(nn.Module):
 
 class Head(SharedHead):
     def __init__(self):
-        # Build all common layers first, in their original initialization order.
+        # Initialize the shared head before the CBAM module.
         super().__init__('concat')
         self.study_arm = 'E01_CBAM'
         self.cbam = CBAM()

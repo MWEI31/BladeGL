@@ -34,7 +34,7 @@ Important source files:
 
 - `src/bladegl/backbone.py`: views, frozen encoder, common projection/decoder.
 - `src/bladegl/model.py`: CECF and full fusion head.
-- `src/bladegl/variants.py`: original structural/training variants.
+- `src/bladegl/variants.py`: structural and training variants.
 - `src/bladegl/cbam.py`: supplementary CBAM alternative.
 - `src/bladegl/runner.py`: raw RGB training, selection, calibration, evaluation.
 - `src/metrics.py`: original-pixel metrics and threshold rules.

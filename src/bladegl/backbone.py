@@ -1,4 +1,4 @@
-"""Complete shared-backbone global/local detection and segmentation model."""
+"""Shared DINOv2 encoder and detection/localization heads."""
 import os
 import time
 os.environ.setdefault('XFORMERS_DISABLED', '1')
@@ -31,7 +31,7 @@ class Encoder(nn.Module):
     @torch.inference_mode()
     def extract(self, rgb, include_direct=True, include_tiles=True, include_global=True,
                 stage_ms=None):
-        # The current released split is entirely square. Fail explicitly for new geometry.
+        # Encoder inputs are square; non-square images require letterboxing.
         assert rgb.ndim==3 and rgb.shape[0]==rgb.shape[1], 'Non-square input requires the documented letterbox geometry adapter.'
         device=self.mean.device
         def measured(name, fn):

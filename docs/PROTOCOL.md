@@ -25,12 +25,10 @@ subject to recall >=0.90 and pixel threshold by anomalous-image mean Dice.
 Final pixel metrics are computed in original image coordinates using exact cell
 area counts, not equal weighting of differently sized images' grid pixels.
 
-The AeBAD manifest contains one duplicate normal training file. The original
-first-occurrence image-hash deduplication is preserved: 416 normal + 186 anomalous
-fit, 104 + 54 development/calibration, and 490 + 909 fixed evaluation images.
-The development and calibration roles intentionally overlap on AeBAD-S.
-KSDD2 fit/dev/cal partitions are mutually disjoint and the official test split
-is retained. The two datasets are trained separately.
+AeBAD-S uses a supervised split with shared development and calibration data.
+Images are deduplicated by hash. KSDD2 uses disjoint fit, development, and
+calibration partitions and the official test split. Each dataset is trained
+separately.
 
 Important source files:
 

@@ -1,0 +1,51 @@
+{
+  "aebad": {
+    "manifest": "manifests/aebad_split_41.csv",
+    "fit_roles": [
+      "train_normal",
+      "support_train"
+    ],
+    "dev_roles": [
+      "val_normal",
+      "support_val"
+    ],
+    "cal_roles": [
+      "val_normal",
+      "support_val"
+    ],
+    "test_roles": [
+      "final_test"
+    ]
+  },
+  "ksdd2": {
+    "manifest": "manifests/ksdd2_split.csv",
+    "fit_roles": [
+      "fit"
+    ],
+    "dev_roles": [
+      "dev"
+    ],
+    "cal_roles": [
+      "cal"
+    ],
+    "test_roles": [
+      "test"
+    ]
+  },
+  "dino_repo": "third_party/dinov2",
+  "dino_weights": "weights/dinov2_vits14_pretrain.pth",
+  "mixed_precision": true,
+  "seeds": [
+    91025,
+    92025,
+    93025
+  ],
+  "batch_size": 4,
+  "max_steps": 3000,
+  "eval_every": 200,
+  "learning_rate": 0.0003,
+  "weight_decay": 0.001,
+  "output_dir": "outputs/bladegl",
+  "image_min_recall": 0.9,
+  "pixel_threshold_candidates": 99
+}

@@ -13,25 +13,28 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from src.data import geometry
 from src.metrics import ap_from_hist, grid_counts, evaluate_maps, score_buckets
-from src.protocol import load_config, read_manifest
+from src.protocol import load_config, read_manifest, resolve
 from src.bladegl.variants import make_head, loss_value
 from src.bladegl.runner import readout, load_image_and_target, map_to_grid
 
 torch.set_num_threads(min(2, torch.get_num_threads()))
 
 
-def test_fixed_manifest_counts_and_no_fit_test_overlap():
+@pytest.mark.parametrize('dataset,counts', [
+    ('aebad', (602, 158, 158, 1399)), ('ksdd2', (1865, 233, 233, 1004))])
+def test_fixed_manifest_counts_and_no_fit_test_overlap(dataset, counts):
     cfg = load_config('configs/bladegl.json')
-    for dataset, counts in [('aebad', (602, 158, 158, 1399)), ('ksdd2', (1865, 233, 233, 1004))]:
-        rows = read_manifest(dataset, cfg)
-        groups = [{r['sample_id'] for r in rows if r['role'] in cfg[dataset][role + '_roles']}
-                  for role in ('fit', 'dev', 'cal', 'test')]
-        assert tuple(map(len, groups)) == counts
-        assert not groups[0] & groups[3]
-        assert not groups[1] & groups[3]
-        if dataset == 'ksdd2':
-            assert not groups[1] & groups[2]
-        assert all('\\' not in row['image'] for row in rows)
+    if not resolve(cfg[dataset]['manifest']).is_file():
+        pytest.skip('Dataset manifest is not provided.')
+    rows = read_manifest(dataset, cfg)
+    groups = [{r['sample_id'] for r in rows if r['role'] in cfg[dataset][role + '_roles']}
+              for role in ('fit', 'dev', 'cal', 'test')]
+    assert tuple(map(len, groups)) == counts
+    assert not groups[0] & groups[3]
+    assert not groups[1] & groups[3]
+    if dataset == 'ksdd2':
+        assert not groups[1] & groups[2]
+    assert all('\\' not in row['image'] for row in rows)
 
 
 def test_exact_original_pixel_counts(tmp_path):

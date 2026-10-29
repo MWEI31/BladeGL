@@ -25,6 +25,9 @@ Pass the dataset path with `--data-root` and set the split manifests in
 [configs/bladegl.json](configs/bladegl.json). See [manifests](manifests/README.md)
 for the CSV format. Data and weights are not included.
 
+Use [prepare_manifest.py](scripts/prepare_manifest.py) to build and validate a
+manifest from an existing sample assignment table.
+
 ## Training and evaluation
 
 AeBAD-S example; replace `data/AeBAD_S` with your dataset path:
@@ -39,6 +42,8 @@ python scripts/run_bladegl.py all --dataset aebad --arm E0 --seed 91025 --data-r
 python scripts/infer.py --input path/to/image.png --checkpoint path/to/model.pt --output-dir outputs/inference
 ```
 
-Outputs include a localization probability map and an image-level score.
+Each run saves a localization probability map and an image-level score in a
+separate subdirectory. Add `--calibration path/to/calibration.json` for thresholded
+predictions, using calibration generated from the same checkpoint.
 
 [License](LICENSE_STATUS.md) · [Third-party components](THIRD_PARTY_NOTICES.md)

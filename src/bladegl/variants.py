@@ -7,6 +7,18 @@ from .model import Head as FusionHead
 from .resize import stable_resize
 
 
+FUSION_ARMS = {
+    'F0': 'baseline', 'F1': 'shift_dot', 'F2': 'shift_cos',
+    'F3': 'shift_conv', 'F5': 'shift_cos_conv__no_position',
+    'F6': 'shift_cos_conv__no_shift', 'F7': 'shift_cos_conv__self',
+    'F8': 'shift_cos_conv__two_regular',
+}
+SUPPORTED_ARMS = frozenset(FUSION_ARMS) | {
+    'E01_CBAM', 'S1', 'S2', 'S3', 'S6', 'R4', 'R5', 'R6',
+    'W4', 'W6', 'W8', 'E0', 'S5', 'F4',
+}
+
+
 class LocalOnlyHead(BasicHead):
     """S3: local spatial evidence with the common global CLS readout."""
 
@@ -24,6 +36,8 @@ class LocalOnlyHead(BasicHead):
 
 
 def make_head(arm: str):
+    if arm not in SUPPORTED_ARMS:
+        raise ValueError(f'Unknown BladeGL arm: {arm}')
     if arm == 'E01_CBAM':
         from .cbam import Head
         return Head()
@@ -43,26 +57,21 @@ def make_head(arm: str):
         return FusionHead('shift_cos_conv', window=int(arm[1:]))
     if arm in ('E0', 'S5', 'F4'):
         return FusionHead('shift_cos_conv')
-    fusion = {
-        'F0': 'baseline', 'F1': 'shift_dot', 'F2': 'shift_cos',
-        'F3': 'shift_conv', 'F5': 'shift_cos_conv__no_position',
-        'F6': 'shift_cos_conv__no_shift', 'F7': 'shift_cos_conv__self',
-        'F8': 'shift_cos_conv__two_regular',
-    }
-    if arm in fusion:
-        return FusionHead(fusion[arm])
+    if arm in FUSION_ARMS:
+        return FusionHead(FUSION_ARMS[arm])
     raise ValueError(f'Unknown BladeGL arm: {arm}')
 
 
 def required_views(arm: str) -> tuple[bool, bool, bool]:
     """Return include_direct, include_tiles, include_global."""
+    if arm not in SUPPORTED_ARMS:
+        raise ValueError(f'Unknown BladeGL arm: {arm}')
     if arm == 'S1':
         return False, False, True
     if arm == 'S2':
         return True, False, True
     if arm == 'S3':
         return False, True, True
-    make_head(arm)
     return False, True, True
 
 

@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT))
 
 from src.protocol import load_config  # noqa: E402
 from src.bladegl.runner import train, evaluate  # noqa: E402
-from src.bladegl.variants import make_head  # noqa: E402
+from src.bladegl.variants import required_views  # noqa: E402
 
 
 def main():
@@ -32,7 +32,7 @@ def main():
         p.error('Seed must be listed in the configuration and budget must be in (0, 1].')
     if not 0 <= args.readout_weight <= 1:
         p.error('Readout weight must be in [0,1]')
-    make_head(args.arm)
+    required_views(args.arm)
     if not args.data_root.is_dir():
         p.error(f'Missing data directory: {args.data_root}')
     import torch

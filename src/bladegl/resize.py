@@ -1,7 +1,6 @@
 """Fixed align_corners=False bilinear geometry with FP32 separable matmuls.
 
-Avoids CUDA interpolation backward's atomic accumulation. CUBLAS deterministic
-workspace and strict deterministic algorithms are required by the entrypoint.
+Avoids atomic accumulation in CUDA interpolation backward.
 """
 from functools import lru_cache
 import torch

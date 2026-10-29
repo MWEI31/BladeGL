@@ -19,6 +19,8 @@ python scripts/download_backbone.py
 
 数据路径通过 `--data-root` 指定，划分清单在 [配置文件](configs/bladegl.json)中设置，格式见 [manifests](manifests/README.md)。仓库不包含数据和权重。
 
+已有样本分组表可用 [prepare_manifest.py](scripts/prepare_manifest.py) 补齐清单字段并检查划分。
+
 ## 训练与评估
 
 以 AeBAD-S 为例，将 `data/AeBAD_S` 替换为实际数据路径：
@@ -33,6 +35,6 @@ python scripts/run_bladegl.py all --dataset aebad --arm E0 --seed 91025 --data-r
 python scripts/infer.py --input path/to/image.png --checkpoint path/to/model.pt --output-dir outputs/inference
 ```
 
-输出包括定位概率图和图像级得分。
+每次结果保存在独立子目录中，包括定位概率图和图像级得分。使用阈值判断时，增加 `--calibration path/to/calibration.json`，并使用同一检查点生成的校准文件。
 
 [项目许可](LICENSE_STATUS.md) · [第三方组件](THIRD_PARTY_NOTICES.md)

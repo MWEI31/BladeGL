@@ -6,6 +6,7 @@ __pycache__/
 .env.*
 data/
 datasets/
+manifests/*.csv
 outputs/
 weights/*
 !weights/README.md

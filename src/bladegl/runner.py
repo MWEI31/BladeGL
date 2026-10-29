@@ -21,6 +21,7 @@ from ..metrics import evaluate_maps, image_metrics, image_threshold_recall_floor
 from ..protocol import read_manifest, resolve, sha256
 from ..cost import profile_rgb_path
 from ..artifacts import readout_artifact
+from ..checkpoints import model_identity, validate_run_lock
 from .backbone import Encoder
 from .variants import loss_value, make_head, required_views
 
@@ -129,11 +130,12 @@ def readout(map_grid, head_logit, mode='combined', weight=.5):
 def predict(encoder, head, root, rows, arm, save_dir=None, mode='combined', weight=.5):
     head.eval()
     scores, maps, shapes, extras = [], [], [], []
+    direct, tiles, global_view = required_views(arm)
+    mode = 'map' if arm == 'R5' else mode
     if save_dir is not None:
         save_dir.mkdir(parents=True, exist_ok=True)
     for row in rows:
         rgb, _, _, meta = load_image_and_target(root, row, read_mask=False)
-        direct, tiles, global_view = required_views(arm)
         feat = encoder.extract(rgb, include_direct=direct, include_tiles=tiles,
                                include_global=global_view)
         with torch.autocast('cuda', dtype=torch.float16,
@@ -141,8 +143,7 @@ def predict(encoder, head, root, rows, arm, save_dir=None, mode='combined', weig
             z, raw = head(feat)
         square = z[0].float().sigmoid().cpu().numpy().astype(np.float16)
         grid = map_to_grid(square, meta)
-        effective_mode = 'map' if arm == 'R5' else mode
-        score, raw_head, top = readout(grid, raw[0].float().cpu(), effective_mode, weight)
+        score, raw_head, top = readout(grid, raw[0].float().cpu(), mode, weight)
         scores.append(score); maps.append(grid); shapes.append(meta[:2])
         extras.append({'sample_id': row['sample_id'], 'label': row['label'],
                        'score': score, 'head_score': raw_head, 'map_top830': top})
@@ -281,11 +282,17 @@ def evaluate(dataset, arm, seed, budget, cfg, data_root, device,
     if not (out/'training_complete.json').is_file():
         raise RuntimeError(f'Complete training first: {out}')
     lock = json.loads((out/'run_lock.json').read_text(encoding='utf-8'))
-    if lock['manifest_sha256'] != sha256(resolve(cfg[dataset]['manifest'])):
-        raise RuntimeError('Manifest changed since training')
-    ck = torch.load(out/'best.pt', map_location='cpu', weights_only=False)
+    current_lock = lock_run(
+        cfg, dataset, arm, seed, budget,
+        budget_rows(role_rows(dataset, cfg, 'fit'), budget, seed),
+        role_rows(dataset, cfg, 'dev'))
+    validate_run_lock(lock, current_lock)
+    checkpoint_path = out / 'best.pt'
+    ck = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
     if ck['lock'] != lock:
         raise RuntimeError('Checkpoint lock mismatch')
+    identity = model_identity(checkpoint_path, ck, cfg, arm)
+    readout_mode = 'map' if arm == 'R5' else readout_mode
     encoder = Encoder(resolve('.'), cfg).to(device).eval()
     head = make_head(arm).to(device).eval()
     head.load_state_dict(ck['head'], strict=True)
@@ -300,6 +307,7 @@ def evaluate(dataset, arm, seed, budget, cfg, data_root, device,
         'image_threshold': image_t, 'pixel_threshold': pixel_t,
         'image_rule': image_rule, 'pixel_rule': pixel_rule,
         'readout': readout_mode, 'head_weight': readout_weight,
+        'model': identity,
         'cal_ids': [r['sample_id'] for r in cal]})
     test_scores, test_maps, shapes, extras = predict(
         encoder, head, data_root, test, arm, out/'test_maps',
@@ -309,6 +317,7 @@ def evaluate(dataset, arm, seed, budget, cfg, data_root, device,
         writer = csv.DictWriter(f, fieldnames=list(extras[0]))
         writer.writeheader(); writer.writerows(extras)
     result = {'dataset': dataset, 'arm': arm, 'seed': seed, 'budget': budget,
+              'model': identity,
               'checkpoint_step': ck['best_step'], 'checkpoint_dev_ap': ck['best_dev_ap'],
               'image': image_metrics(test, test_scores, image_t),
               'pixel': evaluate_maps(data_root, test, test_maps, shapes, pixel_t,

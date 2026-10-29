@@ -79,7 +79,7 @@ def convnorm(a,b,k=3):
 class Head(nn.Module):
     def __init__(self, arm):
         super().__init__()
-        assert arm in ('global','direct_high','concat','residual')
+        assert arm in ('global','direct_high','concat')
         self.arm=arm
         self.project=convnorm(1152,96,1)
         self.decode1=convnorm(96,64)
@@ -88,9 +88,6 @@ class Head(nn.Module):
         self.cls_norm=nn.LayerNorm(384)
         self.detect=nn.Sequential(nn.Linear(385,64),nn.GELU(),nn.Linear(64,1))
         if arm=='concat': self.fuse=convnorm(192,96)
-        if arm=='residual':
-            self.residual=nn.Conv2d(96,96,3,padding=1)
-            self.gate=nn.Sequential(nn.Conv2d(288,32,3,padding=1),nn.GELU(),nn.Conv2d(32,1,1),nn.Sigmoid())
         count=torch.zeros(1,1,72,72)
         for y,x in ((0,0),(0,35),(35,0),(35,35)):count[:,:,y:y+37,x:x+37]+=1
         self.register_buffer('tile_count',count,persistent=False)
@@ -103,50 +100,18 @@ class Head(nn.Module):
             full[:,:,y:y+37,x:x+37]+=p[:,j]
         return full/self.tile_count
 
-    def forward(self, features, return_gate=False, intervention=None):
+    def forward(self, features):
         if self.arm=='direct_high':
-            fused=self.project(features['high_features']);cls=features['cls'];gate=None
+            fused=self.project(features['high_features'])
         else:
             g=stable_resize(self.project(features['global_features']),(72,72))
-            cls=features['cls'];gate=None
             if self.arm=='global':fused=g
             else:
                 l=self.stitch(features['tiles'])
-                if self.arm=='concat':fused=self.fuse(torch.cat([g,l],1))
-                else:
-                    gate=self.gate(torch.cat([g,l,torch.abs(l-g)],1))
-                    fused=g+gate*self.residual(l-g)
-                    if intervention=='local_off':fused=g
-                    elif intervention=='gate_half':fused=g+.5*self.residual(l-g)
-                    elif intervention=='gate_one':fused=g+self.residual(l-g)
+                fused=self.fuse(torch.cat([g,l],1))
         z=self.decode1(stable_resize(fused,(144,144)))
         z=self.segment(self.decode2(stable_resize(z,(288,288))))[:,0]
         q=z.float().sigmoid().flatten(1).topk(830,dim=1).values.mean(1,keepdim=True)
-        normalized_cls=self.cls_norm(cls)
-        if intervention=='map_score_off':q=torch.zeros_like(q)
-        elif intervention=='cls_off':normalized_cls=torch.zeros_like(normalized_cls)
+        normalized_cls=self.cls_norm(features['cls'])
         score=self.detect(torch.cat([normalized_cls,q],dim=1))[:,0]
-        if return_gate:return z,score,gate
         return z,score
-
-
-class CompleteModel(nn.Module):
-    def __init__(self,root,cfg,arm='residual'):
-        super().__init__()
-        self.encoder=Encoder(root,cfg)
-        self.head=Head(arm)
-
-    def forward_rgb(self,rgb):
-        f=self.encoder.extract(rgb,include_direct=self.head.arm=='direct_high',include_tiles=self.head.arm in ('concat','residual'),include_global=self.head.arm!='direct_high')
-        with torch.autocast(device_type='cuda',dtype=torch.float16):
-            z,s=self.head(f)
-        return z.float().sigmoid(),s.float().sigmoid()
-
-
-def loss_value(z,s,target,label):
-    bce=F.binary_cross_entropy_with_logits(z.float(),target,pos_weight=z.new_tensor(8.).float())
-    p=z.float().sigmoid();abnormal=label>0
-    dice=1-(2*(p*target).sum((1,2))+1)/(p.sum((1,2))+target.sum((1,2))+1)
-    dl=dice[abnormal].mean() if abnormal.any() else z.sum()*0
-    image=F.binary_cross_entropy_with_logits(s.float(),label)
-    return bce+.3*dl+.2*image

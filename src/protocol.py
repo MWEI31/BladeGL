@@ -4,7 +4,6 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
-import random
 from pathlib import Path
 
 
@@ -34,6 +33,10 @@ def load_config(path: str | Path) -> dict:
 
 def read_manifest(dataset: str, cfg: dict) -> list[dict]:
     path = resolve(cfg[dataset]["manifest"])
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Missing dataset manifest: {path}. "
+            "Use scripts/prepare_manifest.py with your sample assignments.")
     with path.open(newline="", encoding="utf-8-sig") as f:
         rows = list(csv.DictReader(f))
     if not rows:
@@ -75,6 +78,10 @@ def read_manifest(dataset: str, cfg: dict) -> list[dict]:
     ids = [x["sample_id"] for x in normalized]
     if len(ids) != len(set(ids)):
         raise ValueError("Duplicate sample_id in manifest")
+    allowed_roles = set().union(*(cfg[dataset][f"{r}_roles"]
+                                  for r in ("fit", "dev", "cal", "test")))
+    if any(x["label"] not in (0, 1) or x["role"] not in allowed_roles for x in normalized):
+        raise ValueError("Invalid label or dataset role in manifest")
     roles = {r: [x for x in normalized if x["role"] in cfg[dataset][f"{r}_roles"]]
              for r in ("fit", "dev", "cal", "test")}
     if any(not v for v in roles.values()):
@@ -82,6 +89,16 @@ def read_manifest(dataset: str, cfg: dict) -> list[dict]:
     for a in ("fit", "dev", "cal"):
         if {x["sample_id"] for x in roles[a]} & {x["sample_id"] for x in roles["test"]}:
             raise ValueError(f"{a}/test overlap")
+    pairs = [("fit", "dev"), ("fit", "cal"), ("fit", "test"),
+             ("dev", "test"), ("cal", "test")]
+    if dataset == "ksdd2":
+        pairs.append(("dev", "cal"))
+    for a, b in pairs:
+        for key in ("image", "image_sha256"):
+            left = {x[key] for x in roles[a] if x.get(key)}
+            right = {x[key] for x in roles[b] if x.get(key)}
+            if left & right:
+                raise ValueError(f"{a}/{b} overlap by {key}")
     if dataset == "ksdd2":
         for a, b in (("fit", "dev"), ("fit", "cal"), ("dev", "cal")):
             if {x["sample_id"] for x in roles[a]} & {x["sample_id"] for x in roles[b]}:
@@ -91,47 +108,3 @@ def read_manifest(dataset: str, cfg: dict) -> list[dict]:
     if dataset == "ksdd2" and len(roles["test"]) != 1004:
         raise ValueError("KSDD2 official test count changed")
     return normalized
-
-
-def split_ksdd2(canonical: Path, data_root: Path, output: Path, seed: int = 20260928) -> dict:
-    """Stratified train-internal 80/10/10 split; official test is untouched."""
-    with canonical.open(newline="", encoding="utf-8-sig") as f:
-        records = list(csv.DictReader(f))
-    train = [x for x in records if x["split"] == "train"]
-    test = [x for x in records if x["split"] == "test"]
-    if len(train) != 2331 or len(test) != 1004:
-        raise ValueError("Canonical KSDD2 counts do not match official split")
-    rng = random.Random(seed)
-    rows = []
-    from .data import imread
-    import cv2
-    groups = {0: [], 1: []}
-    for x in train:
-        mask = imread(data_root / x["mask"].replace("\\", "/"), cv2.IMREAD_GRAYSCALE)
-        if mask is None:
-            raise FileNotFoundError(x["mask"])
-        groups[int(mask.max() > 0)].append(x)
-    for label, group in groups.items():
-        rng.shuffle(group)
-        n_fit = round(len(group) * .8)
-        n_dev = round(len(group) * .1)
-        for i, x in enumerate(group):
-            role = "fit" if i < n_fit else "dev" if i < n_fit + n_dev else "cal"
-            rows.append({"sample_id": f"train_{Path(x['image']).stem}", "role": role,
-                         "image": x["image"], "mask": x["mask"], "label": label,
-                         "condition": "", "defect_type": ""})
-    for x in test:
-        mask = imread(data_root / x["mask"].replace("\\", "/"), cv2.IMREAD_GRAYSCALE)
-        if mask is None:
-            raise FileNotFoundError(x["mask"])
-        rows.append({"sample_id": f"test_{Path(x['image']).stem}", "role": "test",
-                     "image": x["image"], "mask": x["mask"],
-                     "label": int(mask.max() > 0), "condition": "", "defect_type": ""})
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with output.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0]))
-        writer.writeheader(); writer.writerows(sorted(rows, key=lambda x: (x["role"], x["sample_id"])))
-    counts = {r: {str(label): sum(x["role"] == r and x["label"] == label for x in rows)
-                  for label in (0, 1)} for r in ("fit", "dev", "cal", "test")}
-    return {"seed": seed, "counts": counts, "manifest_sha256": sha256(output),
-            "note": "No verified object IDs available; image-level stratification only."}
